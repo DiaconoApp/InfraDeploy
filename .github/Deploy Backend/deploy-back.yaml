@@ -1,0 +1,46 @@
+name: Deploy to Amazon
+
+on:
+ repository_dispatch:
+    types: [worker-image-updated, core-image-updated]
+
+jobs:
+   deploy:
+      name: Deploy on private EC2
+      runs-on: ubuntu-latest
+      concurrency:
+         group: deploy-backend
+         cancel-in-progress: true
+      steps:
+         - name: Setup SSH keys
+            env:
+               SSH_KEY_PUBLIC_BASTION: ${{ secrets.SSH_KEY_PUBLIC_BASTION }}
+               SSH_KEY_PRIVATE_TARGET: ${{ secrets.SSH_KEY_PRIVATE_TARGET }}
+               BASTION_HOST: ${{ secrets.BASTION_HOST }}
+               TARGET_HOST: ${{ secrets.TARGET_HOST }}
+            run: |
+               set -euo pipefail
+               mkdir -p ~/.ssh
+               chmod 700 ~/.ssh
+
+               echo "$SSH_KEY_PUBLIC_BASTION" > ~/.ssh/bastion.pem
+               echo "$SSH_KEY_PRIVATE_TARGET" > ~/.ssh/target.pem
+               chmod 600 ~/.ssh/bastion.pem ~/.ssh/target.pem
+
+               ssh-keyscan -H "$BASTION_HOST" >> ~/.ssh/known_hosts
+               ssh-keyscan -H "$TARGET_HOST" >> ~/.ssh/known_hosts
+
+         - name: Deploy via bastion
+            env:
+               BASTION_HOST: ${{ secrets.BASTION_HOST }}
+               BASTION_USER: ${{ secrets.BASTION_USER }}
+               TARGET_HOST: ${{ secrets.TARGET_HOST }}
+               TARGET_USER: ${{ secrets.TARGET_USER }}
+               REPO_DIR: ${{ secrets.REPO_DIR }}
+               REPO_BRANCH: ${{ secrets.REPO_BRANCH }}
+            run: |
+               set -euo pipefail
+               ssh -i ~/.ssh/bastion.pem -J "$BASTION_USER@$BASTION_HOST" \
+                  -i ~/.ssh/target.pem "$TARGET_USER@$TARGET_HOST" \
+                  "cd $REPO_DIR && git fetch --all && git checkout $REPO_BRANCH && git pull && docker compose -f docker-compose.yml up -d --remove-orphans"
+
