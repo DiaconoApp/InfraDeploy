@@ -40,7 +40,11 @@ jobs:
         run: |
           set -euo pipefail
           
-          # Adicionamos o parâmetro '-o StrictHostKeyChecking=no' para o Target ignorar o scan que faltou
-          ssh -i ~/.ssh/bastion.pem -J "$BASTION_USER@$BASTION_HOST" \
-             -i ~/.ssh/target.pem -o StrictHostKeyChecking=no "$TARGET_USER@$TARGET_HOST" \
+          # Executa o SSH forçando a aceitação de chaves RSA antigas (comum na AWS Academy)
+          ssh -v -i ~/.ssh/bastion.pem \
+             -o StrictHostKeyChecking=no \
+             -o PubkeyAcceptedKeyTypes=+ssh-rsa \
+             -J "$BASTION_USER@$BASTION_HOST" \
+             -i ~/.ssh/target.pem \
+             "$TARGET_USER@$TARGET_HOST" \
              "cd $REPO_DIR && git fetch --all && git checkout $REPO_BRANCH && git pull && docker compose -f docker-compose.yml pull && docker compose -f docker-compose.yml up -d --remove-orphans"
