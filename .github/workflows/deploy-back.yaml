@@ -17,7 +17,6 @@ jobs:
           SSH_KEY_PUBLIC_BASTION: ${{ secrets.SSH_KEY_PUBLIC_BASTION }}
           SSH_KEY_PRIVATE_TARGET: ${{ secrets.SSH_KEY_PRIVATE_TARGET }}
           BASTION_HOST: ${{ secrets.BASTION_HOST }}
-          TARGET_HOST: ${{ secrets.TARGET_HOST }}
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
@@ -27,8 +26,8 @@ jobs:
           echo "$SSH_KEY_PRIVATE_TARGET" > ~/.ssh/target.pem
           chmod 600 ~/.ssh/bastion.pem ~/.ssh/target.pem
 
+          # Escaneamos APENAS o Bastion, que está acessível na internet
           ssh-keyscan -H "$BASTION_HOST" >> ~/.ssh/known_hosts
-          ssh-keyscan -H "$TARGET_HOST" >> ~/.ssh/known_hosts
 
       - name: Deploy via bastion
         env:
@@ -40,6 +39,8 @@ jobs:
           REPO_BRANCH: ${{ secrets.REPO_BRANCH }}
         run: |
           set -euo pipefail
+          
+          # Adicionamos o parâmetro '-o StrictHostKeyChecking=no' para o Target ignorar o scan que faltou
           ssh -i ~/.ssh/bastion.pem -J "$BASTION_USER@$BASTION_HOST" \
-             -i ~/.ssh/target.pem "$TARGET_USER@$TARGET_HOST" \
+             -i ~/.ssh/target.pem -o StrictHostKeyChecking=no "$TARGET_USER@$TARGET_HOST" \
              "cd $REPO_DIR && git fetch --all && git checkout $REPO_BRANCH && git pull && docker compose -f docker-compose.yml pull && docker compose -f docker-compose.yml up -d --remove-orphans"
