@@ -49,9 +49,9 @@ jobs:
           ssh-add ~/.ssh/bastion.pem
           ssh-add ~/.ssh/target.pem
           
-          # Executa o SSH usando 'docker compose' (sem o hífen e sem a flag -f)
+          # Executa o SSH usando o bash -l -c para carregar os caminhos do Docker na máquina privada
           ssh -v -o StrictHostKeyChecking=no \
                  -o PubkeyAcceptedKeyTypes=+ssh-rsa \
                  -J "$BASTION_USER@$BASTION_HOST" \
                  "$TARGET_USER@$TARGET_HOST" \
-                 "cd $REPO_DIR && git fetch --all && git checkout $REPO_BRANCH && git pull && docker compose pull && docker compose up -d --remove-orphans"
+                 "bash -l -c 'cd $REPO_DIR && git fetch --all && git checkout $REPO_BRANCH && git pull && docker compose pull && docker compose up -d --remove-orphans'"
