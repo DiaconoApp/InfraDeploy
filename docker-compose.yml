@@ -1,6 +1,7 @@
 services:
   mariadb:
     image: mariadb:11
+    restart: always
     container_name: ${DB_HOST:-diacono_bd_container}
     env_file:
       - ./.env
@@ -17,6 +18,7 @@ services:
 
   rabbitmq:
     image: rabbitmq:3-management
+    restart: always
     container_name: ${RABBIT_HOST:-diacono_rm}
     env_file:
       - ./.env
@@ -32,6 +34,7 @@ services:
 
   redis:
     image: redis:7
+    restart: always
     container_name: ${REDIS_HOST:-redis}
     command: ["redis-server", "--appendonly", "yes"]
     env_file:
@@ -43,6 +46,7 @@ services:
 
   core_api_1:
     image: ${CORE_API_IMAGE:-your-org/core-api:latest}
+    restart: always
     container_name: core_api_1
     env_file:
       - ./.env
@@ -57,6 +61,7 @@ services:
 
   core_api_2:
     image: ${CORE_API_IMAGE:-your-org/core-api:latest}
+    restart: always
     container_name: core_api_2
     env_file:
       - ./.env
@@ -71,6 +76,7 @@ services:
 
   worker:
     image: ${WORKER_IMAGE:-your-org/worker:latest}
+    restart: always
     container_name: worker
     env_file:
       - ./.env
