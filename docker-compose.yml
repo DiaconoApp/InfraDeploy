@@ -1,0 +1,90 @@
+services:
+  mariadb:
+    image: mariadb:11
+    container_name: ${DB_HOST:-diacono_bd_container}
+    env_file:
+      - ./.env
+    environment:
+      MARIADB_DATABASE: ${DB_NAME}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    networks:
+      - app_net
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: ${RABBIT_HOST:-diacono_rm}
+    env_file:
+      - ./.env
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBIT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBIT_PASS}
+    ports:
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - app_net
+
+  redis:
+    image: redis:7
+    container_name: ${REDIS_HOST:-redis}
+    command: ["redis-server", "--appendonly", "yes"]
+    env_file:
+      - ./.env
+    volumes:
+      - redis_data:/data
+    networks:
+      - app_net
+
+  core_api_1:
+    image: ${CORE_API_IMAGE:-your-org/core-api:latest}
+    container_name: core_api_1
+    env_file:
+      - ./.env
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mariadb
+      - rabbitmq
+      - redis
+    networks:
+      - app_net
+
+  core_api_2:
+    image: ${CORE_API_IMAGE:-your-org/core-api:latest}
+    container_name: core_api_2
+    env_file:
+      - ./.env
+    ports:
+      - "80:8080"
+    depends_on:
+      - mariadb
+      - rabbitmq
+      - redis
+    networks:
+      - app_net
+
+  worker:
+    image: ${WORKER_IMAGE:-your-org/worker:latest}
+    container_name: worker
+    env_file:
+      - ./.env
+    depends_on:
+      - mariadb
+      - rabbitmq
+      - redis
+    networks:
+      - app_net
+
+networks:
+  app_net:
+    driver: bridge
+
+volumes:
+  mariadb_data:
+  rabbitmq_data:
+  redis_data:
