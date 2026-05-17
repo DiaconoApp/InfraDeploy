@@ -14,7 +14,8 @@ jobs:
     steps:
       - name: Setup SSH keys
         env:
-          SSH_KEY_PUBLIC_BASTION: ${{ secrets.SSH_KEY_PUBLIC_BASTION }}
+          # Certifique-se de que este secret contém a chave PRIVADA (.pem) do Bastion
+          SSH_KEY_PRIVATE_BASTION: ${{ secrets.SSH_KEY_PRIVATE_BASTION }} 
           SSH_KEY_PRIVATE_TARGET: ${{ secrets.SSH_KEY_PRIVATE_TARGET }}
           BASTION_HOST: ${{ secrets.BASTION_HOST }}
         run: |
@@ -22,11 +23,12 @@ jobs:
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
-          echo "$SSH_KEY_PUBLIC_BASTION" > ~/.ssh/bastion.pem
+          # Salvando as chaves privadas corretas
+          echo "$SSH_KEY_PRIVATE_BASTION" > ~/.ssh/bastion.pem
           echo "$SSH_KEY_PRIVATE_TARGET" > ~/.ssh/target.pem
           chmod 600 ~/.ssh/bastion.pem ~/.ssh/target.pem
 
-          # Escaneamos APENAS o Bastion, que está acessível na internet
+          # Escaneia o Bastion para evitar confirmação manual de host
           ssh-keyscan -H "$BASTION_HOST" >> ~/.ssh/known_hosts
 
       - name: Deploy via bastion
@@ -40,11 +42,14 @@ jobs:
         run: |
           set -euo pipefail
           
-          # Executa o SSH forçando a aceitação de chaves RSA antigas (comum na AWS Academy)
-          ssh -v -i ~/.ssh/bastion.pem \
-             -o StrictHostKeyChecking=no \
-             -o PubkeyAcceptedKeyTypes=+ssh-rsa \
-             -J "$BASTION_USER@$BASTION_HOST" \
-             -i ~/.ssh/target.pem \
-             "$TARGET_USER@$TARGET_HOST" \
-             "cd $REPO_DIR && git fetch --all && git checkout $REPO_BRANCH && git pull && docker compose -f docker-compose.yml pull && docker compose -f docker-compose.yml up -d --remove-orphans"
+          # Inicializa o agente SSH e adiciona as duas chaves na memória do runner
+          eval $(ssh-agent -s)
+          ssh-add ~/.ssh/bastion.pem
+          ssh-add ~/.ssh/target.pem
+          
+          # Executa o SSH usando o agente automático para resolver o salto do Bastion
+          ssh -v -o StrictHostKeyChecking=no \
+                 -o PubkeyAcceptedKeyTypes=+ssh-rsa \
+                 -J "$BASTION_USER@$BASTION_HOST" \
+                 "$TARGET_USER@$TARGET_HOST" \
+                 "cd $REPO_DIR && git fetch --all && git checkout $REPO_BRANCH && git pull && docker compose -f docker-compose.yml pull && docker compose -f docker-compose.yml up -d --remove-orphans"
