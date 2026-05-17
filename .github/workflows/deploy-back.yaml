@@ -14,8 +14,8 @@ jobs:
     steps:
       - name: Setup SSH keys
         env:
-          # Passamos as chaves direto para o ambiente do passo
-          SECRET_BASTION_KEY: ${{ secrets.SSH_KEY_PRIVATE_BASTION }}
+          # Alterado para BUNDLE_PUBLIC_BASTION para bater exatamente com o seu print
+          SECRET_BASTION_KEY: ${{ secrets.SSH_KEY_PUBLIC_BASTION }}
           SECRET_TARGET_KEY: ${{ secrets.SSH_KEY_PRIVATE_TARGET }}
           BASTION_HOST: ${{ secrets.BASTION_HOST }}
         run: |
@@ -23,7 +23,7 @@ jobs:
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
-          # As aspas duplas mantêm as quebras de linha originais do segredo sem sofrer com recuos do YAML
+          # As aspas duplas mantêm as quebras de linha originais do segredo
           echo "$SECRET_BASTION_KEY" > ~/.ssh/bastion.pem
           echo "$SECRET_TARGET_KEY" > ~/.ssh/target.pem
 
