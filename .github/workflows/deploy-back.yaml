@@ -14,22 +14,20 @@ jobs:
     steps:
       - name: Setup SSH keys
         env:
+          # Passamos as chaves direto para o ambiente do passo
+          SECRET_BASTION_KEY: ${{ secrets.SSH_KEY_PRIVATE_BASTION }}
+          SECRET_TARGET_KEY: ${{ secrets.SSH_KEY_PRIVATE_TARGET }}
           BASTION_HOST: ${{ secrets.BASTION_HOST }}
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
-          # O uso do 'cat << 'EOF'' garante que o GitHub injete o texto mantendo as quebras de linha originais
-          cat << 'EOF' > ~/.ssh/bastion.pem
-          ${{ secrets.SSH_KEY_PRIVATE_BASTION }}
-          EOF
+          # As aspas duplas mantêm as quebras de linha originais do segredo sem sofrer com recuos do YAML
+          echo "$SECRET_BASTION_KEY" > ~/.ssh/bastion.pem
+          echo "$SECRET_TARGET_KEY" > ~/.ssh/target.pem
 
-          cat << 'EOF' > ~/.ssh/target.pem
-          ${{ secrets.SSH_KEY_PRIVATE_TARGET }}
-          EOF
-
-          # Ajusta as permissões de segurança exigidas pelo SSH
+          # Ajusta as permissões exigidas pelo SSH
           chmod 600 ~/.ssh/bastion.pem ~/.ssh/target.pem
 
           # Escaneia o Bastion para evitar o aviso de "Host desconhecido"
@@ -46,12 +44,12 @@ jobs:
         run: |
           set -euo pipefail
           
-          # Inicializa o agente SSH e adiciona as duas chaves na memória do runner
+          # Inicializa o agente SSH e adiciona as duas chaves salvas na memória
           eval $(ssh-agent -s)
           ssh-add ~/.ssh/bastion.pem
           ssh-add ~/.ssh/target.pem
           
-          # Executa o SSH usando o agente automático para resolver o salto do Bastion
+          # Executa o SSH usando o agente automático para saltar pelo Bastion
           ssh -v -o StrictHostKeyChecking=no \
                  -o PubkeyAcceptedKeyTypes=+ssh-rsa \
                  -J "$BASTION_USER@$BASTION_HOST" \
