@@ -39,8 +39,8 @@ jobs:
                REPO_DIR: ${{ secrets.REPO_DIR }}
                REPO_BRANCH: ${{ secrets.REPO_BRANCH }}
             run: |
-               set -euo pipefail
-               ssh -i ~/.ssh/bastion.pem -J "$BASTION_USER@$BASTION_HOST" \
-                  -i ~/.ssh/target.pem "$TARGET_USER@$TARGET_HOST" \
-                  "cd $REPO_DIR && git fetch --all && git checkout $REPO_BRANCH && git pull && docker compose -f docker-compose.yml up -d --remove-orphans"
+              set -euo pipefail
+              ssh -i ~/.ssh/bastion.pem -J "$BASTION_USER@$BASTION_HOST" \
+                 -i ~/.ssh/target.pem "$TARGET_USER@$TARGET_HOST" \
+                 "cd $REPO_DIR && git fetch --all && git checkout $REPO_BRANCH && git pull && docker compose -f docker-compose.yml pull && docker compose -f docker-compose.yml up -d --remove-orphans"
 
