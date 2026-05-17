@@ -14,21 +14,25 @@ jobs:
     steps:
       - name: Setup SSH keys
         env:
-          # Certifique-se de que este secret contém a chave PRIVADA (.pem) do Bastion
-          SSH_KEY_PRIVATE_BASTION: ${{ secrets.SSH_KEY_PRIVATE_BASTION }} 
-          SSH_KEY_PRIVATE_TARGET: ${{ secrets.SSH_KEY_PRIVATE_TARGET }}
           BASTION_HOST: ${{ secrets.BASTION_HOST }}
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
-          # Salvando as chaves privadas corretas
-          echo "$SSH_KEY_PRIVATE_BASTION" > ~/.ssh/bastion.pem
-          echo "$SSH_KEY_PRIVATE_TARGET" > ~/.ssh/target.pem
+          # O uso do 'cat << 'EOF'' garante que o GitHub injete o texto mantendo as quebras de linha originais
+          cat << 'EOF' > ~/.ssh/bastion.pem
+          ${{ secrets.SSH_KEY_PRIVATE_BASTION }}
+          EOF
+
+          cat << 'EOF' > ~/.ssh/target.pem
+          ${{ secrets.SSH_KEY_PRIVATE_TARGET }}
+          EOF
+
+          # Ajusta as permissões de segurança exigidas pelo SSH
           chmod 600 ~/.ssh/bastion.pem ~/.ssh/target.pem
 
-          # Escaneia o Bastion para evitar confirmação manual de host
+          # Escaneia o Bastion para evitar o aviso de "Host desconhecido"
           ssh-keyscan -H "$BASTION_HOST" >> ~/.ssh/known_hosts
 
       - name: Deploy via bastion
