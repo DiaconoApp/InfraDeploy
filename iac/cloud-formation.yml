@@ -1,0 +1,249 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation Template for Diacono with VPC, Subnet, Route Table, Internet Gateway, NAT Gateway, Security Group, and EC2 Instance
+
+Parameters:
+  VpcDiaconoParameter:
+    Description: VPC CIDR block for Diacono
+    Type: String
+    Default: 10.0.0.0/20
+    
+
+  SubnetPublicDiaconoParameter:
+    Description: Public Subnet CIDR block for Diacono
+    Type: String
+    Default: 10.0.0.0/24
+
+  SubnetPrivateDiaconoParameter:
+    Description: Private Subnet CIDR block for Diacono
+    Type: String
+    Default: 10.0.8.0/24
+  
+  MyIP:
+    Description: Your IP address in CIDR format (e.g)
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    AllowedPattern: '^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  
+
+Resources:
+  VpcDiacono:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcDiaconoParameter
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: ricardo-01242024-diacono-vpc
+
+  SubnetPublicDiacono:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VpcDiacono
+      AvailabilityZone: us-east-1a
+      CidrBlock: !Ref SubnetPublicDiaconoParameter
+      MapPublicIpOnLaunch: true #talvez alterar
+      Tags:
+        - Key: Name
+          Value: ricardo-01242024-diacono-public-subnet
+
+  SubnetPrivateDiacono:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VpcDiacono
+      AvailabilityZone: us-east-1a
+      CidrBlock: !Ref SubnetPrivateDiaconoParameter
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: ricardo-01242024-diacono-private-subnet
+    
+  InternetGatewayDiacono:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: ricardo-01242024-diacono-igw
+  
+  AttachInternetGatewayDiacono:
+    Type: AWS::EC2::VPCGatewayAttachment #associa o IGW à VPC
+    Properties:
+      VpcId: !Ref VpcDiacono
+      InternetGatewayId: !Ref InternetGatewayDiacono
+  
+  RouteTablePublicDiacono:
+    Type: AWS::EC2::RouteTable #cria o route table para a sub-rede pública sem regras de roteamento
+    Properties:
+      VpcId: !Ref VpcDiacono
+      Tags:
+        - Key: Name
+          Value: ricardo-01242024-diacono-public-rt
+  
+  RoutePublicDiacono:
+    Type: AWS::EC2::Route #cria a rota para o IGW na tabela de rotas da sub-rede pública (regras de roteamento)
+    DependsOn: AttachInternetGatewayDiacono
+    Properties:
+      RouteTableId: !Ref RouteTablePublicDiacono
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGatewayDiacono
+  
+  SubnetRouteTableAssociationPublicDiacono:
+    Type: AWS::EC2::SubnetRouteTableAssociation #associa a sub-rede pública à tabela de rotas da sub-rede pública
+    Properties:
+      SubnetId: !Ref SubnetPublicDiacono
+      RouteTableId: !Ref RouteTablePublicDiacono
+  
+
+  NatGatewayEIPDiacono:
+    Type: AWS::EC2::EIP #cria o Elastic IP para o NAT Gateway
+    DependsOn: AttachInternetGatewayDiacono
+    Properties:
+      Domain: vpc
+
+  NatGatewayDiacono:
+    Type: AWS::EC2::NatGateway #cria o NAT Gateway na sub-rede pública
+    Properties:
+      SubnetId: !Ref SubnetPublicDiacono
+      AllocationId: !GetAtt NatGatewayEIPDiacono.AllocationId
+      Tags:
+        - Key: Name
+          Value: ricardo-01242024-diacono-nat-gateway
+  
+  RouteTablePrivateDiacono:
+    Type: AWS::EC2::RouteTable #cria o route table para a sub-rede privada sem regras de roteamento
+    Properties:
+      VpcId: !Ref VpcDiacono
+      Tags:
+        - Key: Name
+          Value: ricardo-01242024-diacono-private-rt
+  
+  RoutePrivateDiacono:
+    Type: AWS::EC2::Route #cria a rota para o NAT Gateway na tabela de rotas da sub-rede privada (regras de roteamento)
+    Properties:
+      RouteTableId: !Ref RouteTablePrivateDiacono
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayDiacono
+  
+  SubnetRouteTableAssociationPrivateDiacono:
+    Type: AWS::EC2::SubnetRouteTableAssociation #associa a sub-rede
+    Properties:
+      SubnetId: !Ref SubnetPrivateDiacono
+      RouteTableId: !Ref RouteTablePrivateDiacono
+
+  SecurityGroupPublicDiacono:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP access via my IP address
+      VpcId: !Ref VpcDiacono
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0 
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0  
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref MyIP
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: ricardo-01242024-diacono-public-sg
+  
+  KeyPairPublicDiacono:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: public-diacono-keypair 
+      Tags:
+        - Key: Name
+          Value: ricardo-01242024-diacono-keypair
+  
+  WebServerDiacono:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0ec10929233384c7f # Ubuntu Server 22.04 LTS (HVM), SSD Volume Type - us-east-1
+      InstanceType: t3.micro
+      SubnetId: !Ref SubnetPublicDiacono
+      SecurityGroupIds:
+        - !Ref SecurityGroupPublicDiacono
+      KeyName: !Ref KeyPairPublicDiacono
+      UserData: !Base64 |
+        #!/bin/bash
+        export DEBIAN_FRONTEND=noninteractive
+        sudo apt-get update -y
+        sudo apt-get install -y docker.io
+        sudo systemctl start docker
+        sudo systemctl enable docker
+        sudo usermod -aG docker ubuntu
+        sudo docker pull chavess/front-diacono:latest
+        sudo docker run -d -p 8080:80 -p 443:443 -v /etc/letsencrypt:/etc/letsencrypt --name front --restart always chavess/front-diacono:latest
+      Tags:
+        - Key: Name
+          Value: ricardo-01242024-diacono-webserver
+
+  SecurityGroupPrivateDiacono:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP access from public subnet
+      VpcId: !Ref VpcDiacono
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref SecurityGroupPublicDiacono
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: ricardo-01242024-diacono-private-sg
+  
+  KeyPairPrivateDiacono:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: private-diacono-keypair 
+      Tags:
+        - Key: Name
+          Value: ricardo-01242024-diacono-private-keypair
+  
+  AppServerDiacono:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-091138d0f0d41ff90 # Ubuntu Server 22.04 LTS (HVM), SSD Volume Type - us-east-1
+      InstanceType: t3.medium
+      SubnetId: !Ref SubnetPrivateDiacono
+      SecurityGroupIds:
+        - !Ref SecurityGroupPrivateDiacono
+      KeyName: !Ref KeyPairPrivateDiacono
+      UserData: !Base64 |
+        #!/bin/bash
+        export DEBIAN_FRONTEND=noninteractive
+        sudo apt-get update -y
+        sudo apt-get install -y docker.io docker-compose
+        sudo systemctl start docker
+        sudo systemctl enable docker
+        sudo usermod -aG docker ubuntu
+      Tags:
+        - Key: Name
+          Value: ricardo-01242024-diacono-appserver
+
+
+Outputs:
+  WebsiteURL:
+    Value: !Sub "http://${WebServerDiacono.PublicIp}:8080"
+    Description: Website URL
